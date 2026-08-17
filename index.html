@@ -1140,7 +1140,7 @@ class Component extends DCLogic {
     { id:'eh',   layer:'application', use_zh:'對名單客戶發送訊息、追蹤結果', use_en:'Send campaigns to audiences & track results', kind:'h', x:1035, y:40, w:825, h:120, zh:'Engagement Hub', en:'Engagement Hub', sub_zh:'行銷互動', sub_en:'Marketing', role_zh:'Campaign + Journey 行銷觸達', role_en:'Campaign + Journey engagement', storage_zh:'自己保管 Campaign 與 Journey；發送紀錄回寫 Data Warehouse', storage_en:'Own RDB (campaign, journey); logs to DW', plain_zh:'拿到客戶分群後發 EDM / 推播、追蹤抵達結果', plain_en:'Takes segments and delivers campaigns (email/push), tracks results' },
     // Asset row (y=200)
     { id:'edp',     layer:'asset', use_zh:'整合客戶身分、產生名單與 Profile', use_en:'Identity resolution & audience creation', kind:'h', core:true, x:296,  y:220, w:495, h:130, zh:'EDP', en:'EDP', sub_zh:'實體資料平台', sub_en:'Entity Data Platform', role_zh:'以 Entity 為主的下游資料中台 + IDR 身分打通（只做人）', role_en:'Entity-centric downstream data hub + IDR identity resolution (person only)', storage_zh:'Metadata 與 Golden Profile / Segment 自己保管', storage_en:'Metadata, Profile & Segment kept internally', plain_zh:'把同一個人在不同系統的資料合併成一張黃金名單（IDR 只做人）', plain_en:'Merges the same person across systems into one Golden Profile (IDR: person only)' },
-    { id:'qs',      layer:'asset', use_zh:'自助查資料、跑 SQL、拉圖表', use_en:'Self-service SQL & BI', kind:'h', x:831,  y:220, w:495, h:130, zh:'Query Service', en:'Query Service', sub_zh:'查詢服務', sub_en:'Self-service OLAP', role_zh:'自助 OLAP：Dataset + Trino + Superset BI', role_en:'Self-service OLAP: Dataset + Trino + Superset BI', storage_zh:'Dataset 定義存 RDB；不存明細（Trino 直查）', storage_en:'Datasets in RDB; no detail (Trino direct)', plain_zh:'建 Dataset 後直接跟 SQL、拉圖表，不用複製資料', plain_en:'Build a Dataset and run SQL / charts without copying data' },
+    { id:'qs',      layer:'asset', use_zh:'自助查資料、跑 SQL、拉圖表', use_en:'Self-service SQL & BI', kind:'h', x:831,  y:220, w:495, h:130, zh:'Query Service', en:'Query Service', sub_zh:'查詢服務', sub_en:'Self-service OLAP', role_zh:'自助 OLAP：Pinot + Trino + Superset BI', role_en:'Self-service OLAP: Pinot + Trino + Superset BI', storage_zh:'Dataset 定義存 RDB；不存明細（Trino 直查）?', storage_en:'Datasets in RDB; no detail (Trino direct)?', plain_zh:'建 Dataset 後直接下 SQL、拉圖表分析，即時響應', plain_en:'Build a Dataset, run SQL, chart it — realtime response' },
     { id:'omnitag', layer:'asset', use_zh:'用 SQL 定義即時 / 離線標籤', use_en:'Author realtime / batch tags in SQL', kind:'h', hbase:true, x:1366, y:220, w:495, h:130, zh:'OmniTag', en:'OmniTag', sub_zh:'標籤中心', sub_en:'Tag Center', role_zh:'自助建即時 / 離線標籤', role_en:'SQL self-service realtime / batch tags', storage_zh:'定義存 RDB；即時標籤→HBase；離線標籤自己保管', storage_en:'Defs in RDB; realtime→HBase; batch kept internally', notes_zh:'已建立的即時標籤一律落 HBase', notes_en:'All realtime tags land in HBase', plain_zh:'用 SQL 建「活躍客戶」、「高風險」這類標籤，即時或離線給下游使用', plain_en:'Author “active customer” / “high risk” tags in SQL, realtime or batch' },
     // Data row (y=360)
     { id:'compute', layer:'data', use_zh:'跑大量運算、ETL、模型訓練', use_en:'Large-scale compute, ETL, ML training', kind:'h', x:296,  y:410, w:700, h:120, zh:'Compute Studio', en:'Compute Studio', sub_zh:'運算工作台', sub_en:'Compute', role_zh:'按需大規模運算：ETL / 模型訓練', role_en:'On-demand compute: ETL / Spark / ML training', storage_zh:'Job 定義自己保管；結果寫回 Data Warehouse / Lake Space', storage_en:'Job defs in RDB; results to DW / Lake Space', plain_zh:'跑 ETL、跑大量計算、訓練模型的平台', plain_en:'Where ETL jobs, heavy computations, and ML training run' },
@@ -1161,21 +1161,22 @@ class Component extends DCLogic {
     { from:'compute', to:'dw', type:'persist', protocol:'Spark write', format:'Iceberg (DWD/DWS/ADS)', frequency:'batch', zh:'運算結果、寬表寫回倉', en:'ETL results & wide tables to DW' },
     { from:'compute', to:'storage', type:'persist', protocol:'檔案', format:'檔案', frequency:'on-demand', zh:'使用者將檔案上傳至 Lake Space 供後續運算；運算後結果輸出至 Lake Space 儲存', en:'Users upload files to Lake Space for compute; results output back to Lake Space' },
     { from:'dw', to:'storage', type:'persist', protocol:'檔案', format:'檔案', frequency:'JOB', zh:'使用者在 DW 建置完成的倉表，資料存入 Lake Space', en:'Warehouse tables built in DW are persisted to Lake Space' },
-    { from:'qs', to:'storage', type:'persist', protocol:'檔案', format:'檔案', frequency:'on-demand', zh:'使用者在 QS-Superset 上傳檔案 存入 Lake Space', en:'Users upload files via QS-Superset into Lake Space' },
+    // (moved to QS-owned block below per QS 0812 spec) QS → LS 上傳檔案已改為 flow 邊，見下方
     { from:'eh', to:'dw', type:'persist', protocol:'JDBC', format:'Table', frequency:'batch', zh:'Campaign 發送紀錄回寫', en:'Campaign delivery logs written back' },
     // read
     { from:'compute', to:'storage', type:'read', protocol:'檔案', format:'檔案', frequency:'on-demand', zh:'使用者從 Lake Space 讀取檔案進行運算', en:'Users read files from Lake Space for compute' },
     { from:'dw', to:'storage', type:'read', protocol:'檔案', format:'檔案', frequency:'JOB', zh:'使用者在 DW 建置倉表時，會從 Lake Space 讀取資料', en:'When users build warehouse tables in DW, DW reads from Lake Space' },
     { from:'compute', to:'dw', type:'read', protocol:'Spark / JDBC', format:'Iceberg', frequency:'on-demand', zh:'讀倉內分層資料', en:'Read layered DW data' },
-    { from:'qs', to:'dw', type:'read', protocol:'Trino', format:'SQL', frequency:'on-demand', zh:'自助查倉', en:'Self-service OLAP over DW' },
-    { from:'qs', to:'storage', type:'read', protocol:'檔案', format:'檔案', frequency:'on-demand', zh:'使用者從 Lake Space 讀取檔案進行運算', en:'Users read files from Lake Space for compute' },
+    // NOTE: QS 0812 移除 qs → dw (Trino 直查)，改以 DW → QS JOB 同步（見下方新版上下游）
+    // LS → QS · 使用者透過 QS-Superset 讀取 Lake Space 檔案（依 LS 0812 保留）
+    { from:'qs', to:'storage', type:'read', protocol:'檔案', format:'檔案', frequency:'on-demand', zh:'使用者透過 QS-Superset 從 Lake Space 讀取檔案（LS 0812 列 LS → QS 為下游；QS 0812 未列，方向待雙方對齊）', en:'Users read files from Lake Space via QS-Superset (per LS 0812; direction pending QS/LS alignment)', notes_zh:'LS ↔ QS 方向待對齊', notes_en:'Direction pending alignment' },
     { from:'omnitag', to:'dw', type:'read', protocol:'SQL', format:'Table', frequency:'batch', zh:'離線標籤從倉取數', en:'Batch tag SQL reads DW' },
     // api
-    { from:'edp', to:'qs', type:'api', protocol:'REST', format:'JSON', frequency:'on-demand', badge_zh:'資料 + 運算都靠 QS', badge_en:'Data & compute via QS', zh:'EDP 的資料來自 QS；分群的集合運算（交集 / 排除）也委派 QS 執行', en:'EDP data comes from QS; Segment set ops (union / intersect / exclude) also delegated to QS' },
-    { from:'risk', to:'edp', type:'api', protocol:'API response', format:'API response', frequency:'on-demand', zh:'客戶設置規則時，透過 EDP 查詢可用之 Event / 標籤 / 表；查詢 Profile 時，透過 EDP 取得資料', en:'When users configure rules, RM queries EDP for available events / tags / tables; also fetches Profile via EDP' },
+    { from:'qs', to:'edp', type:'in', protocol:'API response', format:'API response', frequency:'on-demand', badge_zh:'EDP 主動查 QS', badge_en:'EDP polls QS', zh:'EDP 主動透過 API 向 QS 查詢；EDP 的資料來自 QS，分群的集合運算（交集 / 排除）也委派 QS 執行', en:'EDP actively queries QS via API; EDP data comes from QS and set ops (union / intersect / exclude) are delegated to QS' },
+    { from:'edp', to:'risk', type:'in', protocol:'API response', format:'API response', frequency:'on-demand', zh:'客戶設置規則時，透過 EDP 查詢可用之 Event / 標籤 / 表；查詢 Profile 時，透過 EDP 取得資料', en:'When users configure rules, RM queries EDP for available events / tags / tables; also fetches Profile via EDP' },
     { from:'eh', to:'edp', type:'api', protocol:'REST', format:'JSON', frequency:'on-demand', zh:'拿 Segment、查 Profile', en:'Fetch Segment, query Profile' },
     // OmniTag 不直接對到 Risk / EH，標籤資料統一透過 EDP 回饋為 Entity 屬性再被使用
-    { from:'qs', to:'catalog', type:'api', protocol:'REST', format:'JSON', frequency:'on-demand', zh:'查 Dataset 元資料', en:'Query Dataset metadata' },
+    // NOTE: QS 0812 只列一條 QS → Data Catalog（治理/待 DC 說明），已合併至下方
     { from:'edp', to:'catalog', type:'api', protocol:'REST', format:'JSON', frequency:'on-demand', zh:'查表結構與血緣', en:'Query Entity table schema / lineage' },
     { from:'compute', to:'catalog', type:'api', protocol:'REST', format:'JSON', frequency:'on-demand', zh:'Job 執行時查表元資料', en:'Query metadata at job runtime' },
     // stream
@@ -1183,20 +1184,24 @@ class Component extends DCLogic {
     { from:'bridge', to:'omnitag', type:'stream', protocol:'Kafka Consumer', format:'Avro / JSON', frequency:'realtime', zh:'即時標籤計算', en:'Realtime tag computation (Flink)' },
     { from:'bridge', to:'risk', type:'stream', protocol:'Kafka Event', format:'Kafka Event', frequency:'on-event', zh:'監聽客戶行為，一產生立即進行決策流判斷', en:'RM listens to customer behaviour; every event triggers realtime decision-flow evaluation' },
     { from:'risk', to:'bridge', type:'stream', protocol:'API request', format:'API request', frequency:'on-demand', zh:'規則引擎判斷後發送通知，透過 Data Bridge 打 Webhook API 推送至外部客戶指定 endpoint', en:'After RM decision, notifications are pushed via Data Bridge as webhook API calls to external endpoints' },
-    { from:'risk', to:'storage', type:'persist', protocol:'API response', format:'API response', frequency:'on-demand', zh:'規則引擎判斷後進行實體貼標，需儲存至 QS or LS？（待與工程討論）', en:'After RM decision, entities are tagged and persisted to QS or LS? (pending engineering)' },
+    { from:'risk', to:'storage', type:'flow', protocol:'API response', format:'API response', frequency:'on-demand', zh:'規則引擎判斷後進行實體貼標，需儲存至 QS or LS？（待與工程討論）', en:'After RM decision, entities are tagged and persisted to QS or LS? (pending engineering)', notes_zh:'待與工程討論', notes_en:'Pending engineering' },
     { from:'edp', to:'eh', type:'stream', protocol:'Kafka Producer', format:'JSON', frequency:'realtime', zh:'Segment 成員變動 + Profile 變更推播', en:'Segment membership + Profile change push' },
-    { from:'omnitag', to:'qs', type:'stream', protocol:'Dataset', format:'Table', frequency:'realtime + batch', zh:'OmniTag 建好標籤後直接流到 QS，使用者可在 QS 直接查看', en:'Tags built in OmniTag flow directly to QS for viewing' },
+    // NOTE: OmniTag → QS 已依 QS 0812 移除（QS 上游僅列 DW / Data Bridge），待 OmniTag 負責人回饋後再定
     // catalog registration
     { from:'bridge', to:'catalog', type:'catalog', zh:'資料源結構、入湖表註冊', en:'Source schema & landing table' },
     { from:'dw', to:'catalog', type:'catalog', zh:'分層表元資料、血緣註冊', en:'Layered table metadata & lineage' },
     { from:'compute', to:'catalog', type:'catalog', zh:'Job 血緣（輸入 / 輸出）', en:'Job lineage' },
     { from:'edp', to:'catalog', type:'catalog', zh:'客戶實體 / 分群定義註冊', en:'Entity / Segment definitions' },
     { from:'omnitag', to:'catalog', type:'catalog', zh:'標籤定義、血緣註冊', en:'Tag definitions & lineage' },
-    { from:'qs', to:'catalog', type:'catalog', zh:'Dataset 定義註冊', en:'Dataset definitions' },
+    { from:'qs', to:'catalog', type:'catalog', frequency:'on-demand', zh:'待 DC 說明 須提供那些資訊？（QS 0812）', en:'TBD — pending Data Catalog definition (QS 0812)' },
+    // QS 0812 新版上下游
+    { from:'dw', to:'qs', type:'flow', protocol:'檔案', format:'檔案', frequency:'JOB', zh:'（Offline）Data Warehouse 依 Pinot 設定同步頻率把資料同步到 QS', en:'(Offline) DW syncs to QS on the Pinot schedule' },
+    { from:'bridge', to:'qs', type:'flow', protocol:'data', format:'data', frequency:'streaming', zh:'（Realtime）Data Bridge 持續同步資料到 QS', en:'(Realtime) Data Bridge streams to QS continuously' },
+    { from:'qs', to:'storage', type:'flow', protocol:'檔案', format:'檔案', frequency:'on-demand', zh:'使用者在 QS-Superset 上傳檔案會存入 Lake Space（Iceberg H7000）', en:'Users upload files via QS-Superset; data lands in Lake Space (Iceberg H7000)' },
     // Lake Space → Data Catalog (governance registration, pending DC scope)
     { from:'storage', to:'catalog', type:'catalog', frequency:'on-demand', zh:'待 DC 說明 須提供那些資訊？', en:'TBD — pending Data Catalog definition' },
-    // authz (all products → IAM) — Lake Space has no IAM edge in the 0812 pointing (the doc's IAM row was an example)
-    ...['eh','edp','qs','omnitag','compute','dw','bridge','catalog'].map(id => ({ from:id, to:'iam', type:'governance', zh:'SpiceDB 角色 + Ranger 授權；操作 log 回寫 IAM', en:'SpiceDB role + Ranger authz; audit logs to IAM' })),
+    // authz (all products → IAM) — Lake Space & Query Service 0812 未在盤點列 IAM（IAM 行為 doc 中的範例），故不列入
+    ...['eh','edp','omnitag','compute','dw','bridge','catalog'].map(id => ({ from:id, to:'iam', type:'governance', zh:'SpiceDB 角色 + Ranger 授權；操作 log 回寫 IAM', en:'SpiceDB role + Ranger authz; audit logs to IAM' })),
   ];
 
   componentDidMount() {
@@ -1282,11 +1287,11 @@ class Component extends DCLogic {
           title_zh:'⑥ 運算結果寫回', title_en:'⑥ Persist results',
           body_zh:'Spark 產出的分析結果寫回 Data Warehouse 的下游分層；中間檔與模型檔則保存到 Lake Space。', body_en:'Spark outputs are written back to DW downstream layers; intermediate & model files persist to Data Storage.',
           actor_zh:'分析師 / Data Analyst', actor_en:'Data Analyst', action_zh:'決定產出表格式、版本與命名', action_en:'Decides the output table format, versioning, naming' },
-        { nodes:['qs','dw','storage'], edges:[['qs','dw','read'],['qs','storage','read']],
+        { nodes:['qs','dw','storage'], edges:[['dw','qs','flow']],
           title_zh:'⑦ 業務端用 QS 查看結果', title_en:'⑦ Business consumers query via QS',
           body_zh:'業務、營運、主管透過 Query Service 用 Dataset、SQL 或 BI 直接查看剛產出的分析結果，不需要複製資料。', body_en:'Business, ops, and leadership query the fresh results via Dataset / SQL / BI without copying data.',
           actor_zh:'業務 / 分析師 / 主管', actor_en:'Business · Analyst · Leadership', action_zh:'開啟 Dataset 或 BI 面板，取用最終分析結果', action_en:'Open Dataset or BI dashboards to consume the results' },
-        { nodes:['qs','dw','edp'], edges:[['qs','dw','read'],['edp','qs','api']],
+        { nodes:['qs','dw','edp'], edges:[['dw','qs','flow'],['qs','edp','in']],
           title_zh:'⑧ 轉折點 · 若要繼續在 DIP 產品活用：DW → QS → EDP', title_en:'⑧ Turning point · to keep it in DIP: DW → QS → EDP',
           body_zh:'若運算結果不只是看、而是要繼續驅動後續產品：先從 Data Warehouse 拉到 Query Service 建成 Dataset，再由 EDP 呼叫 QS 取名單與執行集合運算 —— 資料不搬，又能被下游產品共用。', body_en:'If the results are meant to power downstream products (not just be viewed): they flow from Data Warehouse into a QS Dataset; EDP then calls QS to fetch audiences and run set operations — no data copy, still shareable to downstream apps.',
           actor_zh:'分析師 + 行銷 PM / DE', actor_en:'Analyst + Marketing PM / DE', action_zh:'在 QS 建 Dataset、在 EDP 定義要共用的 Segment', action_en:'Build the Dataset in QS; define the shareable Segment in EDP' },
@@ -1322,47 +1327,6 @@ class Component extends DCLogic {
       ],
     },
     {
-      id: 'engagement',
-      zh: '精準行銷觸達',
-      en: 'Precision Engagement',
-      desc_zh: '行銷團隊要對「符合特定條件」的客戶做精準觸達 —— 從人員登入、資料入場、標籤/名單建立、到觸發訊息發送與回寫的端到端流程。',
-      desc_en: 'The marketing team wants to reach customers who meet specific criteria — from login through data ingestion, tag & segment creation, and campaign delivery.',
-      steps: [
-        { nodes:['iam','eh'], edges:[['eh','iam','governance']],
-          title_zh:'① 行銷 PM 登入 DIP · 身分與權限驗證', title_en:'① Marketing PM login · identity & authorisation',
-          body_zh:'行銷 PM 登入 DIP，由 IAM 驗證身分並確認可存取的客群、標籤命名空間與 Campaign 權限。', body_en:'The marketing PM logs in to DIP; IAM verifies identity and scopes the segments, tag namespaces, and campaign rights available.',
-          actor_zh:'行銷 PM / Marketing PM', actor_en:'Marketing PM', action_zh:'登入 DIP、進入 Engagement Hub', action_en:'Signs in to DIP and enters Engagement Hub' },
-        { nodes:['external','bridge','dw'], edges:[['external','bridge','ingest'],['bridge','dw','persist']],
-          title_zh:'② 業務資料入場 · 建倉分析所需資料', title_en:'② Business data enters · warehouse for analytics',
-          body_zh:'需要用來做名單分析的業務資料，先透過 Data Bridge 進場並落到 Data Warehouse，成為後續集合運算與 Segment 篩選的基礎。', body_en:'Business data needed for segmentation enters via Data Bridge and lands in the Data Warehouse — the base for downstream set operations and segmentation.',
-          actor_zh:'DE / Data Engineer', actor_en:'Data Engineer (DE)', action_zh:'建置資料入場管道，並將分析用資料落到 DW', action_en:'Sets up the ingestion pipes and lands analytics data into DW' },
-        { nodes:['bridge','omnitag','qs'], edges:[['bridge','omnitag','stream'],['omnitag','qs','stream']],
-          title_zh:'③ 即時資料 · OmniTag 監聽並產出即時標籤', title_en:'③ Realtime data · OmniTag streams tags',
-          body_zh:'需要即時觸發的行為資料由 Data Bridge 直接串流給 OmniTag；OmniTag 監聽這些事件，即時產出對應的行為標籤並送入 QS 供下游使用。', body_en:'Realtime behavioural data streams from Data Bridge directly to OmniTag; OmniTag listens, produces realtime tags, and streams them into QS for downstream consumption.',
-          actor_zh:'行銷 PM / Marketing PM', actor_en:'Marketing PM', action_zh:'定義要監聽的行為條件與即時標籤規則', action_en:'Defines behavioural criteria and realtime tag rules' },
-        { nodes:['qs','dw'], edges:[['qs','dw','read']],
-          title_zh:'④ QS 統一集合運算 · 交集 / 排除 / 聯集', title_en:'④ QS runs set operations · intersect / exclude / union',
-          body_zh:'PM 想要的「符合 A 且不是 B」這類交集與排除條件，統一由 QS 從 DW 拉取名單資料並執行集合運算，避免資料搬運與版本不一致。', body_en:'“Meets A but not B” style intersect / exclude conditions are consolidated in QS — it pulls the segments from DW and computes set operations centrally, avoiding data copies and version drift.',
-          actor_zh:'行銷 PM · 由平台自動組合', actor_en:'Marketing PM · assembled by the platform', action_zh:'PM 在介面上拖拉條件，QS 負責實際計算', action_en:'PM composes conditions on the UI; QS runs the computation' },
-        { nodes:['qs','edp'], edges:[['edp','qs','api']],
-          title_zh:'⑤ EDP 取名單 · IDR 打通身分', title_en:'⑤ EDP fetches segment · IDR resolves identity',
-          body_zh:'QS 產出的候選名單交給 EDP；EDP 透過 IDR 把同一位客戶跨系統的身分打通，整理成單一 Golden Profile 為主的行銷名單。', body_en:'QS hands the candidate list to EDP; EDP resolves the same customer across systems via IDR into a single Golden Profile–anchored audience.',
-          actor_zh:'系統自動 · DE 維護 IDR 規則', actor_en:'Automated · DE maintains IDR rules', action_zh:'DE 負責 IDR 打通規則與 Entity 定義', action_en:'DE owns IDR rules and Entity definitions' },
-        { nodes:['bridge','edp'], edges:[['bridge','edp','stream']],
-          title_zh:'⑥ EDP 訂閱 Data Bridge 即時事件 · 名單狀態自動更新', title_en:'⑥ EDP subscribes to Data Bridge events · audience state auto-updates',
-          body_zh:'EDP 的即時事件直接從 Data Bridge 串流進來——客戶一發生新行為，名單成員、Profile 屬性就自動更新，下游 EH 拿到的名單永遠是最新的。', body_en:'EDP has a realtime channel directly from Data Bridge — as new behaviour occurs, audience membership and Profile attributes update automatically, so EH always consumes the freshest list.',
-          actor_zh:'系統自動', actor_en:'Automated', action_zh:'DE 一次建完訂閱，後續名單自動隨行為更新', action_en:'DE sets the subscription once; audiences track behaviour thereafter' },
-        { nodes:['edp','eh'], edges:[['edp','eh','stream']],
-          title_zh:'⑦ EDP 送整理後的名單給 EH', title_en:'⑦ EDP delivers the resolved audience to EH',
-          body_zh:'EDP 把整理與去重後的名單送到 Engagement Hub，同時訂閱後續成員變動，確保 EH 拿到的名單永遠是最新的。', body_en:'EDP delivers the cleaned, deduplicated audience to Engagement Hub and streams membership updates, so EH always sees the latest list.',
-          actor_zh:'行銷 PM · 系統自動同步', actor_en:'Marketing PM · auto-synced by the platform', action_zh:'PM 在 EH 選定目標名單、綁定 Campaign', action_en:'PM picks the target audience in EH and binds it to a campaign' },
-        { nodes:['eh'], edges:[],
-          title_zh:'⑧ Campaign 監測行為 · 條件命中即發 Webhook', title_en:'⑧ Campaign watches behaviour · fires webhook on match',
-          body_zh:'EH 的 Campaign 持續監測客戶行為，一旦命中預設條件（例如剛進入某標籤且符合名單），就依 PM 設定的目的地即時發送 Webhook 到外部系統執行後續動作。', body_en:'EH’s Campaign continuously watches customer behaviour; when a condition is hit (e.g. customer just enters a tag while on the audience), it fires a webhook to the destination configured by the PM.',
-          actor_zh:'行銷 PM 設定 · 系統自動觸發', actor_en:'PM-configured · platform-triggered', action_zh:'PM 設定觸發條件與 Webhook 目的地；平台負責即時觸發', action_en:'PM configures triggers and webhook targets; the platform fires them in realtime' },
-      ],
-    },
-    {
       id: 'lake_space_upload',
       zh: '提供使用者空間儲存',
       en: 'User File Storage on Lake Space',
@@ -1389,6 +1353,35 @@ class Component extends DCLogic {
           title_zh:'⑤ 從資料夾內下載檔案', title_en:'⑤ Download files from the folder',
           body_zh:'使用者從 Lake Space 資料夾內下載檔案；依權限判斷是否允許取得檔案。', body_en:'The user downloads files from the folder; permission decides whether the file can be retrieved.',
           actor_zh:'DIP 使用者', actor_en:'DIP User', action_zh:'下載檔案', action_en:'Downloads files' },
+      ],
+    },
+    {
+      id: 'qs_risk_report',
+      zh: '製作風控分析報表',
+      en: 'Build a Risk Analytics Report',
+      desc_zh: '風控團隊針對玩家異常行為制定邏輯，在 Query Service 進行報表製作，找出異常的玩家。',
+      desc_en: 'The risk team frames anomaly logic for players and builds a report in Query Service to surface the anomalous ones.',
+      steps: [
+        { nodes:['iam','qs'], edges:[],
+          title_zh:'① 登入 DIP · 進入 Query Service', title_en:'① Login DIP · enter Query Service',
+          body_zh:'風控人員登入 DIP 並進入 Query Service，IAM 驗證身分與可存取的資料範圍。', body_en:'The risk analyst signs in and enters Query Service; IAM verifies identity and the accessible data scope.',
+          actor_zh:'風控人員', actor_en:'Risk Analyst', action_zh:'登入 DIP、進入 Query Service', action_en:'Signs in and opens Query Service' },
+        { nodes:['qs'], edges:[],
+          title_zh:'② 在 QS-Superset 寫 SQL 並執行', title_en:'② Author & run SQL in QS-Superset',
+          body_zh:'風控人員在 QS-Superset 撰寫並執行 SQL：讀取所需資料、進行判斷邏輯運算。', body_en:'The analyst writes and runs SQL in QS-Superset — reading needed data and computing the anomaly logic.',
+          actor_zh:'風控人員', actor_en:'Risk Analyst', action_zh:'撰寫 SQL、執行查詢（讀取 + 運算）', action_en:'Writes SQL and runs the query (read + compute)' },
+        { nodes:['qs'], edges:[],
+          title_zh:'③ 查看執行結果', title_en:'③ View the query result',
+          body_zh:'風控人員在 QS-Superset 檢視查詢結果，確認命中異常玩家的邏輯是否正確。', body_en:'The analyst reviews the result in QS-Superset to validate the anomaly logic.',
+          actor_zh:'風控人員', actor_en:'Risk Analyst', action_zh:'檢視查詢結果', action_en:'Inspects the query output' },
+        { nodes:['qs'], edges:[],
+          title_zh:'④ 下載執行結果', title_en:'④ Download the result',
+          body_zh:'如需離線處理或提供給其他人，風控人員可將執行結果直接下載。', body_en:'For offline handoff, the analyst can download the result directly.',
+          actor_zh:'風控人員', actor_en:'Risk Analyst', action_zh:'下載查詢結果', action_en:'Downloads the query result' },
+        { nodes:['qs'], edges:[],
+          title_zh:'⑤ 製作成 chart', title_en:'⑤ Chart the result',
+          body_zh:'風控人員在 QS-Superset 將執行結果製作成 chart，作為風控分析報表的視覺呈現。', body_en:'The analyst charts the result in QS-Superset as the visual for the risk analytics report.',
+          actor_zh:'風控人員', actor_en:'Risk Analyst', action_zh:'製作圖表、產出報表', action_en:'Builds the chart and produces the report' },
       ],
     },
   ];
@@ -1994,6 +1987,7 @@ class Component extends DCLogic {
       changelog: (() => {
         const layerColor = { application:'#EDA3A3', asset:'#DFB94E', data:'#7DC7A6', infra:'#8FA0DB', governance:'#B7A3DF', external:'#b8a99a' };
         const raw = [
+          { date: '2026-08-17', order: 3, id: 'qs',      product: 'QS', tags: ['關聯', '情境', '文案'] },
           { date: '2026-08-17', order: 2, id: 'storage', product: 'LS', tags: ['關聯', '情境', '文案'] },
           { date: '2026-08-17', order: 1, id: 'risk',    product: 'RM', tags: ['關聯', '情境', '文案'] },
         ];
